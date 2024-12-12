@@ -242,6 +242,11 @@ type ApplyHelmChartConfig struct {
 //		OverrideValues: vals,
 //	})
 func (client *Client) ApplyHelmChart(cfg ApplyHelmChartConfig) error {
+	fmt.Printf("\n=== Starting ApplyHelmChart ===\n")
+	fmt.Printf("Action: %v\n", cfg.Action)
+	fmt.Printf("Release Name: %v\n", cfg.ReleaseName)
+	fmt.Printf("Namespace: %v\n", cfg.Namespace)
+
 	setupDefaults(&cfg)
 
 	if err := setupChartVersion(&cfg); err != nil {
@@ -263,7 +268,13 @@ func (client *Client) ApplyHelmChart(cfg ApplyHelmChartConfig) error {
 	if err = checkIfInstallable(helmChart); err != nil {
 		return ErrApplyHelmChart(err)
 	}
-
+	fmt.Printf("===== Creating Helm action config... ====== \n")
+	fmt.Printf("===== This is the info of the config BEFORE createHelmActionconfig is called, check that cert and key data hasnt been lost... ====== \n")
+	fmt.Printf("Client auth state before action config:\n")
+  fmt.Printf("- Host: %s\n", client.RestConfig.Host)
+  fmt.Printf("- Client Cert Present: %v\n", len(client.RestConfig.TLSClientConfig.CertData) > 0)
+  fmt.Printf("- Client Key Present: %v\n", len(client.RestConfig.TLSClientConfig.KeyData) > 0)
+  fmt.Printf("- Bearer Token Present: %v\n", len(client.RestConfig.BearerToken) > 0)
 	actionConfig, err := createHelmActionConfig(client, cfg)
 	if err != nil {
 		return ErrApplyHelmChart(err)
@@ -273,6 +284,7 @@ func (client *Client) ApplyHelmChart(cfg ApplyHelmChartConfig) error {
 	// this is a workaround make the helm chart installation idempotent
 	if cfg.Action == INSTALL && cfg.UpgradeIfInstalled {
 		if err := updateActionIfReleaseFound(actionConfig, &cfg, *helmChart); err != nil {
+			fmt.Printf("Action execution failed because the certificates were not provided: %v\n", err)
 			return ErrApplyHelmChart(err)
 		}
 	}
@@ -280,7 +292,7 @@ func (client *Client) ApplyHelmChart(cfg ApplyHelmChartConfig) error {
 	if err := generateAction(actionConfig, cfg)(helmChart); err != nil {
 		return ErrApplyHelmChart(err)
 	}
-
+	fmt.Printf("\n=== ApplyHelmChart completed successfully ===\n")
 	return nil
 }
 
@@ -408,6 +420,13 @@ func checkIfInstallable(ch *chart.Chart) error {
 
 // createHelmActionConfig generates the actionConfig with the appropriate defaults
 func createHelmActionConfig(c *Client, cfg ApplyHelmChartConfig) (*action.Configuration, error) {
+	fmt.Printf("\n=== Creating Helm Action Config ===\n")
+	fmt.Printf("\n=== This is the info that gets passed in to createHelmActionConfig ===\n")
+	fmt.Printf("Using Host: %s\n", c.RestConfig.Host)
+	fmt.Printf("Client Cert Present: %v\n", len(c.RestConfig.TLSClientConfig.CertData) > 0)
+	fmt.Printf("Client Key Present: %v\n", len(c.RestConfig.TLSClientConfig.KeyData) > 0)
+	fmt.Printf("Bearer Token Present: %v\n", len(c.RestConfig.BearerToken) > 0)
+	fmt.Printf("CA Data Present: %v\n", len(c.RestConfig.CAData) > 0)
 	// Set the environment variable needed by the Init methods
 	os.Setenv("HELM_DRIVER_SQL_CONNECTION_STRING", cfg.SQLConnectionString)
 
@@ -423,10 +442,16 @@ func createHelmActionConfig(c *Client, cfg ApplyHelmChartConfig) (*action.Config
 	kubeConfig.CAFile = &cafilename
 	kubeConfig.BearerToken = &c.RestConfig.BearerToken
 
+	fmt.Printf("KubeConfig flags set with:\n")
+	fmt.Printf("- API Server: %s\n", *kubeConfig.APIServer)
+	fmt.Printf("- CA File: %s\n", *kubeConfig.CAFile)
+	fmt.Printf("- Bearer Token Set: %v\n", len(*kubeConfig.BearerToken) > 0)
+
 	actionConfig := new(action.Configuration)
 	if err := actionConfig.Init(kubeConfig, cfg.Namespace, string(cfg.HelmDriver), cfg.Logger); err != nil {
 		return nil, ErrApplyHelmChart(err)
 	}
+	fmt.Printf("=== Helm Action Config Created Successfully ===\n\n")
 	return actionConfig, nil
 }
 
