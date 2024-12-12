@@ -15,7 +15,7 @@ type Client struct {
 func New(kubeconfig []byte) (*Client, error) {
 	restConfig, err := DetectKubeConfig(kubeconfig)
 	if err != nil {
-		return nil, err
+		return nil, err 
 	}
 	restConfig.QPS = float32(50)
 	restConfig.Burst = int(100)

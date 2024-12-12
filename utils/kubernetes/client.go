@@ -1,6 +1,7 @@
 package kubernetes
 
 import (
+	"fmt"
 	"os"
 	"path/filepath"
 
@@ -27,6 +28,7 @@ func DetectKubeConfig(configfile []byte) (config *rest.Config, err error) {
 
 	// If deployed within the cluster
 	if config, err = rest.InClusterConfig(); err == nil {
+		fmt.Println("&&&&&&&&&&&&&&&&&&This was deployed in cluster so this worked and credentials were provided")
 		return config, nil
 	}
 
@@ -44,7 +46,9 @@ func DetectKubeConfig(configfile []byte) (config *rest.Config, err error) {
 
 	// Look for kubeconfig at the default path
 	path := filepath.Join(utils.GetHome(), ".kube", "config")
+	fmt.Println("&&&&&&&&&&&&&&&&&this is the path that was gotten for the kubeconfig file ", path)
 	_, cfgFile, err := ProcessConfig(path, "")
+	fmt.Println("&&&&&&&&&&&&&&&&&&&&&&&&&&&&this is the content of the kubeconfig file ", cfgFile )
 	if err != nil {
 		return nil, err
 	}

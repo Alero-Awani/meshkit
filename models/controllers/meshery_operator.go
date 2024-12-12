@@ -72,15 +72,30 @@ func (mo *mesheryOperator) GetStatus() MesheryControllerStatus {
 }
 
 func (mo *mesheryOperator) Deploy(force bool) error {
+	fmt.Println("&&&&&&&&&&&&&&&&&&&starting deployment")
 	status := mo.GetStatus()
 	if status == Undeployed && !force {
 		return nil
 	}
 	if status == Deploying {
-		return ErrDeployController(fmt.Errorf("Already a Meshery Operator is being deployed."))
+		return ErrDeployController(fmt.Errorf("already a Meshery Operator is being deployed"))
+	}
+	// Check if kubeconfig is accessible
+	if mo.client == nil {
+    fmt.Println("&&&&&&&&&&&&&&&&&&&&Kubernetes client is nil. Ensure kubeconfig is loaded properly.")
+    return ErrDeployController(fmt.Errorf("kubernetes client is not initialized"))
+  } else {
+		fmt.Println("&&&&&&&&&&&&&&&&&&&this is what we get for the client ", mo.client)
+		version, err := mo.client.KubeClient.Discovery().ServerVersion()
+		fmt.Println("&&&&&&&& This is the verison that was gotten", version)
+		if err != nil {
+			fmt.Println("&&&&&&&& We were not able to communicate with the cluster hence there is no access to the kubeconfig, more details below.")
+			return(err)
+		}
 	}
 	err := applyOperatorHelmChart(mo.deploymentConf.HelmChartRepo, *mo.client, mo.deploymentConf.MesheryReleaseVersion, false, mo.deploymentConf.GetHelmOverrides(false))
 	if err != nil {
+		fmt.Println("&&&&&&&&&&&&&&&&&&&&&&&&&&&the deployment error is coming from here")
 		return ErrDeployController(err)
 	}
 	mo.setStatus(Deployed)
