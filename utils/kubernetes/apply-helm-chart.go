@@ -437,15 +437,50 @@ func createHelmActionConfig(c *Client, cfg ApplyHelmChartConfig) (*action.Config
 	}
 	cafilename := cafile.Name()
 
+	// Create temp files for client cert and key if they exist
+	var certfile, keyfile *os.File
+  var certfilename, keyfilename string
+
+	if len(c.RestConfig.TLSClientConfig.CertData) > 0 {
+		certfile, err = setDataAndReturnFileHandler(c.RestConfig.TLSClientConfig.CertData)
+		if err != nil {
+				fmt.Printf("Client cert file creation failed: %v\n", err)
+				return nil, err
+		}
+		certfilename = certfile.Name()
+	}
+
+	if len(c.RestConfig.TLSClientConfig.KeyData) > 0 {
+			keyfile, err = setDataAndReturnFileHandler(c.RestConfig.TLSClientConfig.KeyData)
+			if err != nil {
+					fmt.Printf("Client key file creation failed: %v\n", err)
+					return nil, err
+			}
+			keyfilename = keyfile.Name()
+	}
+
 	kubeConfig := genericclioptions.NewConfigFlags(false)
 	kubeConfig.APIServer = &c.RestConfig.Host
 	kubeConfig.CAFile = &cafilename
-	kubeConfig.BearerToken = &c.RestConfig.BearerToken
+
+	// Set client cert and key if they exist
+	if certfilename != "" {
+		kubeConfig.CertFile = &certfilename
+	}
+	if keyfilename != "" {
+			kubeConfig.KeyFile = &keyfilename
+	}
+
+	// Only set bearer token if client certs aren't being used
+	if certfilename == "" && len(c.RestConfig.BearerToken) > 0 {
+			kubeConfig.BearerToken = &c.RestConfig.BearerToken
+	}
 
 	fmt.Printf("KubeConfig flags set with:\n")
 	fmt.Printf("- API Server: %s\n", *kubeConfig.APIServer)
 	fmt.Printf("- CA File: %s\n", *kubeConfig.CAFile)
 	fmt.Printf("- Bearer Token Set: %v\n", len(*kubeConfig.BearerToken) > 0)
+	fmt.Printf("- Certificate set: %s\n", *kubeConfig.CertFile)
 
 	actionConfig := new(action.Configuration)
 	if err := actionConfig.Init(kubeConfig, cfg.Namespace, string(cfg.HelmDriver), cfg.Logger); err != nil {
